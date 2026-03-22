@@ -17,7 +17,7 @@ class Ship():
         self.rect.midbottom = self.screen_rect.midbottom
 
 
-    def blitme(self) -> None:
+    def blit_ship(self) -> None:
         """drawing the ship in glorious 4K; just kidding"""
         self.screen.blit(self.image, self.rect)
 
