@@ -3,7 +3,7 @@
 import sys
 import pygame
 from .settings import Settings
-
+from .ship import Ship
 
 class AlienInvasion():
     """Management for game assets and behavior."""
@@ -17,7 +17,8 @@ class AlienInvasion():
         # pulling gameboard settings from settings.py
         self.screen = pygame.display.set_mode((self.settings.screen_width, self.settings.screen_height))
         pygame.display.set_caption("AlienInvasion")
-        
+        # create ship instance as attribute for AlienInvasion
+        self.ship = Ship(self)
 
     def run_game(self) -> None:
         """Start the main game loop"""
@@ -27,6 +28,8 @@ class AlienInvasion():
                     sys.exit()
             
             self.screen.fill(self.settings.bg_color)
+            # call blitme() to actually draw the ship on the gameboard
+            self.ship.blitme()
             pygame.display.flip()
             # set frame rate
             self.clock.tick(60)
