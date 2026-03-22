@@ -23,9 +23,7 @@ class AlienInvasion():
     def run_game(self) -> None:
         """Start the main game loop"""
         while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    sys.exit()
+            self._check_events()
             
             self.screen.fill(self.settings.bg_color)
             # call blitme() to actually draw the ship on the gameboard
@@ -34,6 +32,11 @@ class AlienInvasion():
             # set frame rate
             self.clock.tick(60)
 
+    def _check_events(self) -> None:
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    sys.exit()
 
 if __name__ == '__main__':
     ai = AlienInvasion()
