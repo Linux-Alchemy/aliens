@@ -14,6 +14,7 @@ class AlienInvasion():
         pygame.init()
         self.clock = pygame.time.Clock()
         self.settings = Settings()
+        # pulling gameboard settings from settings.py
         self.screen = pygame.display.set_mode((self.settings.screen_width, self.settings.screen_height))
         pygame.display.set_caption("AlienInvasion")
         
