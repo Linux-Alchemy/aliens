@@ -34,6 +34,9 @@ class AlienInvasion():
             self.ship.moving_right = True
         elif event.key == pygame.K_LEFT:
             self.ship.moving_left = True
+        # option to quit game with 'q'
+        elif event.key == pygame.K_q:
+            sys.exit()
 
     def _check_key_up(self,event) -> None:
         if event.key == pygame.K_RIGHT:
@@ -50,9 +53,6 @@ class AlienInvasion():
                 self._check_key_down(event)
             elif event.type == pygame.KEYUP:
                 self._check_key_up(event)
-            # option to quit with 'q'
-            elif event.key == pygame.K_q:
-                sys.exit()
 
     def _update_screen(self) -> None:
         """screen update and drawing images"""
