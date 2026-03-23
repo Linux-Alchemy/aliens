@@ -8,6 +8,7 @@ class Ship():
     def __init__(self, ai_game) -> None:
         """initializing the ship and starting position"""
         self.screen = ai_game.screen
+        self.settings = ai_game.settings
         self.screen_rect = ai_game.screen.get_rect()
         # grab ship image and assign it to self.rect
         self.image = pygame.image.load('assets/ship.bmp')
@@ -15,7 +16,19 @@ class Ship():
 
         # setting the starting position for the new ship
         self.rect.midbottom = self.screen_rect.midbottom
+        # using a float to adjust the ship's movement coordinates
+        self.x = float(self.rect.x)
+        self.moving_right = False
+        self.moving_left = False
 
+    def update(self) -> None:
+        """Update the ship's position"""
+        if self.moving_right:
+            self.x += self.settings.ship_speed
+        if self.moving_left:
+            self.x -= self.settings.ship_speed
+
+        self.rect.x = int(self.x)
 
     def blit_ship(self) -> None:
         """drawing the ship in glorious 4K; just kidding"""

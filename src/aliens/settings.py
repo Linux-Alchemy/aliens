@@ -8,4 +8,5 @@ class Settings():
         self.screen_height: int = 800
         self.bg_color: tuple[int, int, int] = (0, 0, 0)
 
-
+        # ship settings
+        self.ship_speed = 1.5
