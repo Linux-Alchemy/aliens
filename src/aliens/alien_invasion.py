@@ -29,13 +29,11 @@ class AlienInvasion():
         while True:
             self._check_events()
             self.ship.update()
-            self.bullets.update()
-            for bullet in self.bullets.copy():
-                if bullet.rect.bottom <= 0:
-                    self.bullets.remove(bullet)
+            self._update_bullets()
             self._update_screen()
             # set frame rate
             self.clock.tick(60)
+
 
     def _check_key_down(self, event) -> None:
         """Listen for key press"""
@@ -58,9 +56,16 @@ class AlienInvasion():
 
     def _fire_bullet(self) -> None:
         """Fire a bullet at the evil doers"""
-        new_bullet = Bullet(self)
-        self.bullets.add(new_bullet)
+        if len(self.bullets) < self.settings.bullet_max_count:
+            new_bullet = Bullet(self)
+            self.bullets.add(new_bullet)
 
+    def _update_bullets(self) -> None:
+        self.bullets.update()
+        # remove bullets that reach the edge of the screen
+        for bullet in self.bullets.copy():
+            if bullet.rect.bottom <= 0:
+                self.bullets.remove(bullet)
 
     def _check_events(self) -> None:
         """Listening for game events"""
@@ -80,6 +85,7 @@ class AlienInvasion():
         # call blit_ship() to actually draw the ship on the gameboard
         self.ship.blit_ship()
         pygame.display.flip()
+
 
 if __name__ == '__main__':
     ai = AlienInvasion()

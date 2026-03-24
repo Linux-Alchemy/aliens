@@ -16,3 +16,4 @@ class Settings():
         self.bullet_width: int = 3
         self.bullet_height: int = 15
         self.bullet_color: tuple[int, int, int] = (60, 60, 60)
+        self.bullet_max_count: int = 10
