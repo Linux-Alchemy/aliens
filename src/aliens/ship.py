@@ -3,10 +3,10 @@
 import pygame
 
 class Ship():
-    """blueprints for the hero ship"""
+    """Blueprints for the hero ship"""
 
     def __init__(self, ai_game) -> None:
-        """initializing the ship and starting position"""
+        """Initializing the ship and starting position"""
         self.screen = ai_game.screen
         self.settings = ai_game.settings
         self.screen_rect = ai_game.screen.get_rect()
@@ -31,7 +31,7 @@ class Ship():
         self.rect.x = int(self.x)
 
     def blit_ship(self) -> None:
-        """drawing the ship in glorious 4K; just kidding"""
+        """Drawing the ship in glorious 4K; just kidding"""
         self.screen.blit(self.image, self.rect)
 
 

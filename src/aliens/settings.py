@@ -9,10 +9,10 @@ class Settings():
         self.bg_color: tuple[int, int, int] = (0, 0, 0)
 
         # ship settings
-        self.ship_speed: float = 1.5
+        self.ship_speed: float = 2.0
 
         # bullet settings
-        self.bullet_speed: int = 2
+        self.bullet_speed: int = 3
         self.bullet_width: int = 3
         self.bullet_height: int = 15
         self.bullet_color: tuple[int, int, int] = (60, 60, 60)
