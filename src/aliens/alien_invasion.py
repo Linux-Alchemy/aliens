@@ -30,6 +30,7 @@ class AlienInvasion():
             self.clock.tick(60)
 
     def _check_key_down(self, event) -> None:
+        """listen for key press"""
         if event.key == pygame.K_RIGHT:
             self.ship.moving_right = True
         elif event.key == pygame.K_LEFT:
@@ -39,6 +40,7 @@ class AlienInvasion():
             sys.exit()
 
     def _check_key_up(self,event) -> None:
+        """listen for key release"""
         if event.key == pygame.K_RIGHT:
            self.ship.moving_right = False
         elif event.key == pygame.K_LEFT:
