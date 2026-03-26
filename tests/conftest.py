@@ -20,3 +20,5 @@ def pygame_game(pygame_init):
     """Creating an AlienInvasion instance"""
     game = alien_invasion.AlienInvasion()
     return game
+
+

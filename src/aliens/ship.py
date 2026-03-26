@@ -1,6 +1,9 @@
 # this is where the hero's ship is built to defeat the evil alien scum!
 
 import pygame
+from pathlib import Path
+
+ship_image = Path(__file__).parent.parent.parent/"assets"/"ship.bmp"
 
 class Ship():
     """Blueprints for the hero ship"""
@@ -11,7 +14,7 @@ class Ship():
         self.settings = ai_game.settings
         self.screen_rect = ai_game.screen.get_rect()
         # grab ship image and assign it to self.rect
-        self.image = pygame.image.load('assets/ship.bmp')
+        self.image = pygame.image.load(ship_image)
         self.rect = self.image.get_rect()
 
         # setting the starting position for the new ship
