@@ -5,6 +5,7 @@ import pygame
 from .settings import Settings
 from .ship import Ship
 from .bullet import Bullet
+from .alien import Alien
 
 class AlienInvasion():
     """Management for game assets and behavior."""
@@ -22,7 +23,8 @@ class AlienInvasion():
         # create ship & bullet instance as attribute for AlienInvasion
         self.ship = Ship(self)
         self.bullets = pygame.sprite.Group()
-
+        self.aliens = pygame.sprite.Group()
+        self._create_fleet()
 
     def run_game(self) -> None:
         """Start the main game loop"""
@@ -34,6 +36,11 @@ class AlienInvasion():
             # set frame rate
             self.clock.tick(60)
 
+
+    def _create_fleet(self) -> None:
+        """Create the fleet of alien evil doers"""
+        alien = Alien(self)
+        self.aliens.add(alien)
 
     def _check_key_down(self, event) -> None:
         """Listen for key press"""
@@ -84,6 +91,7 @@ class AlienInvasion():
             bullet.draw_bullet()
         # call blit_ship() to actually draw the ship on the gameboard
         self.ship.blit_ship()
+        self.aliens.draw(self.screen)
         pygame.display.flip()
 
 

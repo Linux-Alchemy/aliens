@@ -3,7 +3,7 @@
 import pygame
 from pathlib import Path
 
-ship_image = Path(__file__).parent.parent.parent/"assets"/"ship.bmp"
+ship_image = Path(__file__).parent.parent.parent/"assets"/"ship2.jpg"
 
 class Ship():
     """Blueprints for the hero ship"""
@@ -14,7 +14,7 @@ class Ship():
         self.settings = ai_game.settings
         self.screen_rect = ai_game.screen.get_rect()
         # grab ship image and assign it to self.rect
-        self.image = pygame.image.load(ship_image)
+        self.image = pygame.image.load(ship_image).convert_alpha()
         self.rect = self.image.get_rect()
 
         # setting the starting position for the new ship
