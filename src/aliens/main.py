@@ -1,4 +1,4 @@
-# invasion file
+# main game file
 
 import sys
 import pygame
