@@ -20,7 +20,7 @@ class AlienInvasion():
         self.screen = pygame.display.set_mode((self.settings.screen_width, self.settings.screen_height))
         pygame.display.set_caption("AlienInvasion")
         
-        # create ship & bullet instance as attribute for AlienInvasion
+        # create ship & bullet & aline instance as attribute for AlienInvasion
         self.ship = Ship(self)
         self.bullets = pygame.sprite.Group()
         self.aliens = pygame.sprite.Group()
@@ -36,11 +36,28 @@ class AlienInvasion():
             # set frame rate
             self.clock.tick(60)
 
+    def _create_alien(self, x_position, y_position) -> None:
+        """Creating an single alien and adding to the row"""
+        new_alien = Alien(self)
+        new_alien.x = x_position
+        new_alien.rect.x = x_position
+        new_alien.rect.y = y_position
+        self.aliens.add(new_alien)
 
     def _create_fleet(self) -> None:
         """Create the fleet of alien evil doers"""
         alien = Alien(self)
-        self.aliens.add(alien)
+        alien_width, alien_height = alien.rect.size
+
+        current_x, current_y = alien_width, alien_height
+        while current_y < (self.settings.screen_height - 3 * alien_height):
+            while current_x < (self.settings.screen_width - 2 * alien_width):
+                self._create_alien(current_x, current_y)
+                current_x += 2 * alien_width
+
+            # Reset x value and increment y for a new row of alien ship
+            current_x = alien_width
+            current_y += 2 * alien_height
 
     def _check_key_down(self, event) -> None:
         """Listen for key press"""
