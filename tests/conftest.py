@@ -3,7 +3,7 @@
 import pytest
 import pygame
 import os
-from src.aliens import alien_invasion
+from src.aliens import main
 
 @pytest.fixture(scope="session")
 def pygame_init():
@@ -18,7 +18,7 @@ def pygame_init():
 @pytest.fixture(scope="function")
 def pygame_game(pygame_init):
     """Creating an AlienInvasion instance"""
-    game = alien_invasion.AlienInvasion()
+    game = main.AlienInvasion()
     return game
 
 

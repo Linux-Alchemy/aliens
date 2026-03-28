@@ -17,3 +17,6 @@ class Settings():
         self.bullet_height: int = 15
         self.bullet_color: tuple[int, int, int] = (60, 60, 60)
         self.bullet_max_count: int = 10
+
+        # alien fleet settings
+        self.fleet_rows: int = 5

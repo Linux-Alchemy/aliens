@@ -50,7 +50,8 @@ class AlienInvasion():
         alien_width, alien_height = alien.rect.size
 
         current_x, current_y = alien_width, alien_height
-        while current_y < (self.settings.screen_height - 3 * alien_height):
+        row_count = 0
+        while current_y < (self.settings.screen_height - 3 * alien_height) and row_count < self.settings.fleet_rows:
             while current_x < (self.settings.screen_width - 2 * alien_width):
                 self._create_alien(current_x, current_y)
                 current_x += 2 * alien_width
@@ -58,6 +59,7 @@ class AlienInvasion():
             # Reset x value and increment y for a new row of alien ship
             current_x = alien_width
             current_y += 2 * alien_height
+            row_count += 1
 
     def _check_key_down(self, event) -> None:
         """Listen for key press"""
