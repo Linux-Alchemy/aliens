@@ -3,6 +3,7 @@
 import pygame
 from pathlib import Path
 
+
 ship_image = Path(__file__).parent.parent.parent/"assets"/"ship2.jpg"
 
 class Ship():
@@ -37,5 +38,9 @@ class Ship():
         """Drawing the ship in glorious 4K; just kidding"""
         self.screen.blit(self.image, self.rect)
 
-
+    def center_ship(self) -> None:
+        """Centering the ship on the screen"""
+        self.rect.midbottom = self.screen_rect.midbottom
+        self.x = float(self.rect.x)
+        
 

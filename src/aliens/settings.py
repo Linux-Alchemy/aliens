@@ -9,14 +9,15 @@ class Settings():
         self.bg_color: tuple[int, int, int] = (0, 0, 0)
 
         # ship settings
-        self.ship_speed: float = 2.0
+        self.ship_speed: float = 3.0  # change back to 2.0
+        self.ship_limit: int = 3
 
         # bullet settings
-        self.bullet_speed: int = 3
+        self.bullet_speed: int = 4
         self.bullet_width: int = 3
         self.bullet_height: int = 15
         self.bullet_color: tuple[int, int, int] = (60, 60, 60)
-        self.bullet_max_count: int = 10
+        self.bullet_max_count: int = 20 # change back to 10
 
         # alien fleet settings
         self.fleet_rows: int = 5
