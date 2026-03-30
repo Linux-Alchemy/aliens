@@ -12,8 +12,7 @@ testing pygame itself (that's someone else's problem). We're testing that *our*
 code does what we told it to do.
 
 **Framework:** pytest
-**Max tests per file:** 2
-**Total tests:** 8
+**Total tests:** 13
 
 ---
 
@@ -500,31 +499,330 @@ the rect isn't being updated from the float, or the speed value changed.
 
 ---
 
-## Test File 4: `tests/test_alien_invasion.py`
+## Test File 4: `tests/test_alien.py`
 
-**Module under test:** `src/aliens/alien_invasion.py`
-**Why this is tested last:** AlienInvasion is the **integration layer** —
-it wires together Settings, Ship, Bullet, and pygame. Testing it means
-testing that the pieces fit together correctly.
+**Module under test:** `src/aliens/alien.py`
+**Why this is tested here:** Alien depends on the game fixture (it needs a screen and
+settings), so it slots in naturally after Bullet. It introduces testing **methods that
+return values** (`edge_check()`) and **state changes driven by settings** (`update()`).
 
-### What AlienInvasion Does
+### What Alien Does
 
-`AlienInvasion` is the game's main class. It initialises pygame, creates
-the display, instantiates Ship and a bullet Group, runs the main loop, and
-handles all input events. It's the orchestrator.
+`Alien` is a pygame Sprite. It loads an image, positions itself offset from the
+top-left corner by one alien's own dimensions (so the fleet doesn't spawn flush
+against the edge), and exposes `edge_check()` to detect screen boundaries and
+`update()` to move horizontally each frame using `alien_speed` and `fleet_direction`.
 
 ---
 
-### Test 1: `test_game_initializes_with_required_components`
+### Fixture for alien.py tests
+
+```
+Fixture: alien (local to test_alien.py, depends on: game)
+    """
+    Create a fresh Alien instance using the live game object.
+
+    Args:
+        game: A fully initialized AlienInvasion instance from the game fixture.
+
+    Returns:
+        Alien: A new Alien instance positioned at its default starting location.
+    """
+    TODO:
+    - import Alien from src.aliens.alien
+    - create a new Alien(game) instance
+    - return it
+
+    WHY a local fixture and not just Alien(game) in each test?
+    Same reason as the settings fixture — the habit. If Alien's constructor
+    ever gains required arguments or changes its signature, you fix it in
+    one place, not in every test function.
+```
+
+---
+
+### Test 1: `test_alien_starts_at_expected_position`
 
 ```python
-def test_game_initializes_with_required_components(game: AlienInvasion) -> None:
+def test_alien_starts_at_expected_position(alien: Alien) -> None:
     """
-    Verify that AlienInvasion.__init__ creates all required game components.
+    Verify the alien's starting position is offset from the screen edge
+    by exactly one alien's own dimensions.
 
-    The game needs a screen surface, a Settings instance, a Ship instance,
-    and an empty sprite Group for bullets. If any of these are missing,
-    the game loop will crash.
+    The fleet needs breathing room from the screen edges. __init__ sets
+    rect.x = rect.width and rect.y = rect.height to achieve this.
+
+    Args:
+        alien: A fresh Alien instance from the alien fixture.
+    """
+```
+
+**Why this test exists:**
+
+`Alien.__init__` places each alien at:
+```python
+self.rect.x = self.rect.width
+self.rect.y = self.rect.height
+```
+
+This "one alien unit of padding" is a deliberate design choice — it gives the fleet
+a clean starting margin. It also means `_create_fleet()` starts its loop at
+`(alien_width, alien_height)`, which matches this initial position.
+
+If someone changes the starting offset — say, to `0` or to half the width — the
+entire fleet spawns in a different place. This could clip the first alien against
+the edge or leave an unexpectedly large gap. The test **documents the contract**
+between the alien's position and the fleet-building logic.
+
+The float tracker `self.x` must also match `self.rect.x` at creation — same
+reasoning as Ship and Bullet.
+
+```
+TODO (detailed pseudocode):
+
+1. ARRANGE
+   - use the alien fixture (Alien already constructed)
+
+2. ASSERT starting x position
+   - assert alien.rect.x equals alien.rect.width
+   WHY: the alien spawns one alien-width from the left edge. rect.width
+        is the alien image's pixel width, not a magic number. If the image
+        changes size, the offset adapts automatically — the test confirms
+        this relationship holds.
+
+3. ASSERT starting y position
+   - assert alien.rect.y equals alien.rect.height
+   WHY: same logic for the vertical axis. One alien-height from the top.
+
+4. ASSERT float tracker matches rect
+   - assert alien.x equals float(alien.rect.x)
+   WHY: self.x is the float used for sub-pixel movement in update().
+        At creation it must agree with rect.x. If they disagree, the
+        alien will visually jump on its very first update().
+```
+
+**What a failure here tells you:**
+The starting position in `Alien.__init__` changed. Check whether `_create_fleet()`
+also changed to match — they're coupled.
+
+---
+
+### Test 2: `test_alien_edge_check_detects_boundaries`
+
+```python
+def test_alien_edge_check_detects_boundaries(alien: Alien, game: AlienInvasion) -> None:
+    """
+    Verify edge_check() returns True when the alien is at either screen edge,
+    and False when it is safely in the middle of the screen.
+
+    This return value is what _check_fleet_edges() uses to decide whether to
+    reverse the fleet's direction.
+
+    Args:
+        alien: A fresh Alien instance from the alien fixture.
+        game: The AlienInvasion instance, needed to get screen dimensions.
+    """
+```
+
+**Why this test exists:**
+
+`edge_check()` is a **predicate** — a method that asks a yes/no question. It
+returns `True` when the alien has reached (or passed) either boundary:
+
+```python
+return self.rect.right >= screen_rect.right or self.rect.left <= 0
+```
+
+`_check_fleet_edges()` loops through every alien and calls `edge_check()`. If
+any alien returns `True`, the entire fleet reverses direction. This is the core
+of the fleet bouncing mechanic.
+
+Testing a predicate means checking all three meaningful cases: left edge, right
+edge, and the safe middle. If `edge_check()` always returns `True` (broken
+condition) or never returns `True` (wrong comparison operator), the fleet either
+never moves or never stops. Both break the game.
+
+```
+TODO (detailed pseudocode):
+
+1. ARRANGE — get screen dimensions
+   - get the screen rect: screen_rect = game.screen.get_rect()
+
+2. ARRANGE + ACT — test right edge
+   - set alien.rect.right to screen_rect.right
+     (this places the alien exactly at the right boundary)
+
+3. ASSERT — right edge detected
+   - assert alien.edge_check() returns True
+   WHY: the condition is rect.right >= screen_rect.right. At exactly
+        screen_rect.right the comparison is True (equal, not just greater).
+        The >= is intentional — if an alien somehow overshoots, it still
+        triggers the reversal.
+
+4. ARRANGE + ACT — test left edge
+   - set alien.rect.left to 0
+     (flush against the left side of the screen)
+
+5. ASSERT — left edge detected
+   - assert alien.edge_check() returns True
+   WHY: the condition is rect.left <= 0. At exactly 0 (not negative) this
+        should still return True. Tests the boundary value, not just the
+        obviously-out-of-bounds case.
+
+6. ARRANGE + ACT — test safe middle
+   - set alien.rect.x to screen_rect.centerx
+     (well within both boundaries)
+
+7. ASSERT — no edge detected
+   - assert alien.edge_check() returns False
+   WHY: confirms the method doesn't trigger spuriously. If it returned
+        True here, the fleet would reverse every frame and never move
+        horizontally — which would look like the game is frozen.
+```
+
+**What a failure here tells you:**
+The comparison operators in `edge_check()` changed or the screen rect isn't
+being fetched correctly. Check the method's conditional expression.
+
+---
+
+## Test File 5: `tests/test_button.py`
+
+**Module under test:** `src/aliens/button.py`
+**Why test it:** Button is a new module with its own visual contract — it must
+centre itself on screen and centre its text on itself. These are **layout
+relationships** between three objects (screen, button rect, message rect), and
+layout bugs are silent: nothing crashes, the button just looks wrong.
+
+### What Button Does
+
+`Button.__init__` creates a fixed-size rect and positions it at the screen's
+centre. `_prep_msg()` renders the text as a Surface and centres that Surface
+on the button rect. Together they guarantee the button appears in the right
+place with the text in the right place.
+
+---
+
+### Fixture for button.py tests
+
+```
+Fixture: button (local to test_button.py, depends on: game)
+    """
+    Create a fresh Button instance using the live game object.
+
+    Args:
+        game: A fully initialized AlienInvasion instance from the game fixture.
+
+    Returns:
+        Button: A Button instance with the label "Play".
+    """
+    TODO:
+    - import Button from src.aliens.button
+    - create a new Button(game, "Play") instance
+    - return it
+
+    WHY "Play" as the message?
+    It's the real label the game will use. Using the actual value keeps the
+    test grounded in real usage rather than testing with arbitrary data.
+```
+
+---
+
+### Test 1: `test_button_centered_on_screen`
+
+```python
+def test_button_centered_on_screen(button: Button, game: AlienInvasion) -> None:
+    """
+    Verify the button rect is centred on the screen, and the message image
+    is centred on the button.
+
+    Two layout relationships must hold: button-to-screen, and message-to-button.
+    If either is wrong, the visual result is off-centre.
+
+    Args:
+        button: A Button instance from the button fixture.
+        game: The AlienInvasion instance, used to get screen dimensions.
+    """
+```
+
+**Why this test exists:**
+
+`Button.__init__` sets:
+```python
+self.rect.center = self.screen_rect.center
+```
+
+And `_prep_msg()` sets:
+```python
+self.msg_image_rect.center = self.rect.center
+```
+
+These are two chained centring operations. If either line is wrong — or if
+one is applied before the rect has been sized — the button or its label drifts
+off-centre.
+
+This is an example of testing **layout relationships** rather than raw values.
+We don't care what the exact pixel coordinates are (they depend on screen size).
+We care that `button.rect.center == screen.get_rect().center`. That relationship
+must hold regardless of the screen dimensions.
+
+```
+TODO (detailed pseudocode):
+
+1. ARRANGE
+   - use the button and game fixtures
+   - get the screen's rect: screen_rect = game.screen.get_rect()
+
+2. ASSERT button is centred on screen
+   - assert button.rect.center equals screen_rect.center
+   WHY: center is a tuple (x, y). Comparing the whole tuple confirms both
+        horizontal and vertical centering in one assertion. If the button
+        is centred vertically but not horizontally (or vice versa), this
+        catches it. We're asserting a relationship, not a magic number.
+
+3. ASSERT message is centred on button
+   - assert button.msg_image_rect.center equals button.rect.center
+   WHY: the text surface must be centred on the button rect, not on the
+        screen. If _prep_msg() accidentally centres on the screen instead,
+        the text could appear at the right position when the button is
+        centred, but drift if the button is ever repositioned. Testing
+        the message-to-button relationship keeps these concerns separate.
+```
+
+**What a failure here tells you:**
+Either the button rect isn't being centred correctly in `__init__`, or
+`_prep_msg()` isn't centring the text surface on the button rect. Check
+both assignment lines.
+
+---
+
+## Test File 6: `tests/test_alien_invasion.py`
+
+**Module under test:** `src/aliens/main.py`
+**Why this is tested last:** AlienInvasion is the **integration layer** —
+it wires together Settings, Ship, Bullet, Alien, GameStats, and pygame.
+Testing it means testing that the pieces fit together *and* that the
+game's rules (lives, game over, fleet repopulation) behave correctly.
+
+### What AlienInvasion Does
+
+`AlienInvasion` is the game's orchestrator. It initialises every subsystem,
+creates the alien fleet, tracks game state through `GameStats`, and enforces
+rules like lives-based game-over and the bullet limit. The game loop reads
+`self.game_active` each frame to decide whether to run updates.
+
+---
+
+### Test 1: `test_game_initializes_with_fleet_and_stats`
+
+```python
+def test_game_initializes_with_fleet_and_stats(game: AlienInvasion) -> None:
+    """
+    Verify that AlienInvasion.__init__ creates all required game components,
+    including the alien fleet, GameStats, and the game_active flag.
+
+    This is the full preflight checklist — if any component is missing,
+    the game loop will crash on the first frame.
 
     Args:
         game: A fully initialized AlienInvasion instance from the game fixture.
@@ -533,47 +831,64 @@ def test_game_initializes_with_required_components(game: AlienInvasion) -> None:
 
 **Why this test exists:**
 
-This is an **integration smoke test**. It doesn't test complex behaviour —
-it tests that the constructor successfully creates all the objects the game
-loop expects to find. Think of it as a preflight checklist before takeoff.
+This is an **integration smoke test** — not testing complex behaviour, but
+confirming that the constructor successfully created every object the game
+loop depends on. Think of it as a preflight checklist before takeoff.
 
-`run_game()` calls `self.ship.update()`, `self._update_bullets()`, and
-`self._update_screen()`. All of these touch `self.settings`, `self.ship`,
-`self.screen`, and `self.bullets`. If any of those attributes don't exist
-or are the wrong type, the game crashes on the first frame.
+`run_game()` checks `self.game_active`, calls `self.ship.update()`,
+`self._update_bullets()`, `self._update_aliens()`, and `self._update_screen()`.
+All of these touch `self.settings`, `self.ship`, `self.screen`, `self.bullets`,
+`self.aliens`, and `self.stats`. If any attribute is missing or the wrong type,
+the game crashes silently or explodes on frame one.
+
+`game_active` is also critical — it's the gate that controls whether ship,
+bullet, and alien logic run each frame. If it starts as `False`, the game
+loads but appears completely unresponsive.
 
 ```
 TODO (detailed pseudocode):
 
 1. ARRANGE
    - use the game fixture (AlienInvasion is already constructed)
+   - import Settings, Ship, GameStats from their modules
 
-2. ASSERT settings exists and is correct type
+2. ASSERT core display components
    - assert game.settings is an instance of Settings
-   WHY: every other component reads from settings. If it's missing or
-        the wrong type, nothing else works.
-
-3. ASSERT screen exists and is a pygame Surface
    - assert game.screen is an instance of pygame.Surface
-   WHY: the screen is what everything draws to. pygame.display.set_mode()
-        returns a Surface. If this failed silently, we'd have no display.
+   WHY: settings feeds every other component. screen is what everything
+        draws to. These are the lowest-level dependencies.
 
-4. ASSERT ship exists and is correct type
+3. ASSERT ship and bullets exist
    - assert game.ship is an instance of Ship
-   WHY: the game loop calls game.ship.update() and game.ship.blit_ship()
-        every frame. A missing ship means a crash on frame 1.
-
-5. ASSERT bullets group exists and is empty
    - assert game.bullets is an instance of pygame.sprite.Group
    - assert len(game.bullets) equals 0
-   WHY: bullets starts as an empty Group. Bullets get added when the
-        player fires. If it's not a Group (or not empty), the sprite
-        management system won't work correctly.
+   WHY: bullets must start empty — they're added when the player fires.
+        Ship must exist so the game loop can call update() and blit_ship().
+
+4. ASSERT stats exists and has correct type
+   - assert game.stats is an instance of GameStats
+   WHY: _ship_hit() reads and writes game.stats.ships_left. If stats is
+        missing, the first alien collision crashes the game rather than
+        decrementing the life count.
+
+5. ASSERT aliens group exists and fleet is populated
+   - assert game.aliens is an instance of pygame.sprite.Group
+   - assert len(game.aliens) is greater than 0
+   WHY: unlike bullets, aliens should NOT start empty. _create_fleet() is
+        called in __init__, so there should be a full fleet waiting. If
+        len is 0, _create_fleet() failed silently or wasn't called.
+
+6. ASSERT game_active is True
+   - assert game.game_active is True
+   WHY: game_active gates the entire update loop. False at start means the
+        player can't move, shoot, or interact — the game loads but does
+        nothing. It should only become False when ships_left hits 0.
 ```
 
 **What a failure here tells you:**
-Something in AlienInvasion.__init__ was removed, renamed, or reordered in
-a way that broke the construction chain. Check the constructor.
+Something in `AlienInvasion.__init__` was removed, renamed, or reordered.
+The assertion that fails tells you exactly which component is broken —
+check the constructor and each relevant class's `__init__`.
 
 ---
 
@@ -644,18 +959,176 @@ operator and the value of `bullet_max_count`.
 
 ---
 
+### Test 3: `test_ship_hit_decrements_ship_count`
+
+```python
+def test_ship_hit_decrements_ship_count(game: AlienInvasion) -> None:
+    """
+    Verify that _ship_hit() decrements ships_left by one and resets the
+    game board with a fresh fleet.
+
+    Each time the ship is destroyed (alien collision or reaching the bottom),
+    the player should lose one life and the game should reset to a fresh state.
+
+    Args:
+        game: A fully initialized AlienInvasion instance from the game fixture.
+    """
+```
+
+**Why this test exists:**
+
+`_ship_hit()` is the consequence of two separate events: the ship colliding
+with an alien, and aliens reaching the bottom of the screen. Both call
+`_ship_hit()` via `_update_aliens()`. It has two jobs:
+
+1. Decrement `stats.ships_left` (player loses a life)
+2. Reset the board: clear bullets, clear aliens, recreate the fleet,
+   recentre the ship
+
+This test covers job 1 and the "board reset" half of job 2. Testing these
+together makes sense because the decrement only happens *when there are
+ships left* — it's inside an `if self.stats.ships_left > 0:` guard. Testing
+that the count went down also implicitly confirms the guard was entered.
+
+This is also your first test of a **method with side effects** — `_ship_hit()`
+changes multiple pieces of state in one call. The pattern is the same: record
+the "before" state, call the method, assert the expected "after" state.
+
+```
+TODO (detailed pseudocode):
+
+1. ARRANGE
+   - use the game fixture
+   - record the starting life count:
+       store game.stats.ships_left as initial_ships
+     (this will be settings.ship_limit, currently 3)
+
+2. ACT
+   - call game._ship_hit()
+     (simulates the ship being hit once)
+
+3. ASSERT ship count decreased by one
+   - assert game.stats.ships_left equals (initial_ships - 1)
+   WHY: each hit costs exactly one life. The test uses initial_ships - 1
+        rather than hardcoding 2, so the test still works if ship_limit
+        ever changes in Settings.
+
+4. ASSERT fleet was recreated
+   - assert len(game.aliens) is greater than 0
+   WHY: _ship_hit() calls self.aliens.empty() then self._create_fleet().
+        If both happen correctly, the aliens group should be non-empty
+        after the call. If it's 0, either empty() was called but
+        _create_fleet() wasn't, or _create_fleet() produced no aliens.
+
+5. ASSERT game is still active
+   - assert game.game_active is True
+   WHY: game_active should only become False when ships_left hits 0.
+        With initial_ships > 0, this hit should NOT end the game. If
+        game_active is False here, the game ends one hit too early.
+```
+
+**What a failure here tells you:**
+Step 3: the decrement in `_ship_hit()` is missing or has an off-by-one.
+Step 4: `_create_fleet()` wasn't called or produced no aliens.
+Step 5: the `if self.stats.ships_left > 0:` guard is wrong or missing.
+
+---
+
+### Test 4: `test_ship_hit_ends_game_when_no_ships_left`
+
+```python
+def test_ship_hit_ends_game_when_no_ships_left(game: AlienInvasion) -> None:
+    """
+    Verify that _ship_hit() sets game_active to False when ships_left is
+    already zero — triggering the game over condition.
+
+    The game should end, not crash, when all lives are exhausted.
+
+    Args:
+        game: A fully initialized AlienInvasion instance from the game fixture.
+    """
+```
+
+**Why this test exists:**
+
+`_ship_hit()` branches on `ships_left`:
+
+```python
+if self.stats.ships_left > 0:
+    self.stats.ships_left -= 1
+    # ... reset board ...
+else:
+    self.game_active = False
+```
+
+The `else` branch is the **game over condition** — the only way `game_active`
+should ever become `False` through normal gameplay. If this branch is broken,
+one of two bad things happens:
+
+- The `if` is always taken → the game never ends (infinite lives)
+- The `else` fires too early → the game ends before the player runs out of lives
+
+Both are gameplay-breaking bugs that wouldn't cause a crash, just wrong
+behaviour. Tests that catch **silent logic errors** are among the most valuable
+you can write — these are the bugs that pass manual testing unless you
+specifically play through a game over.
+
+This is also a good example of **arranging state to test a specific branch**.
+We don't simulate three deaths to get to zero lives — we directly set
+`ships_left = 0` to isolate the else branch. This keeps the test fast and
+focused on exactly one thing.
+
+```
+TODO (detailed pseudocode):
+
+1. ARRANGE
+   - use the game fixture
+   - manually set game.stats.ships_left to 0
+     (we're forcing the "no lives left" condition directly)
+   WHY: we're not testing the decrement logic here (that's Test 3).
+        We're testing what happens when the count is already zero.
+        Direct state manipulation is the right tool for isolating a branch.
+
+2. ACT
+   - call game._ship_hit()
+
+3. ASSERT game is now over
+   - assert game.game_active is False
+   WHY: the else branch should have set game_active = False. If it's
+        still True, the game never ends — the player has effectively
+        infinite lives. This is the core assertion.
+
+4. ASSERT ships_left did not go negative
+   - assert game.stats.ships_left equals 0
+   WHY: the else branch should NOT decrement ships_left again — it's
+        already at the floor. If ships_left is now -1, the decrement
+        ran when it shouldn't have. Negative lives would cause confusing
+        state if the game were ever restarted.
+```
+
+**What a failure here tells you:**
+Step 3: the `else` branch is missing or unreachable. The `if` condition
+may be wrong (e.g. `>= 0` instead of `> 0`), or the branch sets the
+wrong attribute.
+Step 4: the decrement ran inside the else. Check the if/else structure
+in `_ship_hit()`.
+
+---
+
 ## Test File Structure
 
 When all tests are written, the project should look like this:
 
 ```
 tests/
-    __init__.py          <-- already exists
-    conftest.py          <-- shared fixtures (pygame_init, game)
-    test_settings.py     <-- 2 tests, no pygame dependency
-    test_ship.py         <-- 2 tests, uses game fixture
-    test_bullet.py       <-- 2 tests, uses game fixture
-    test_alien_invasion.py  <-- 2 tests, uses game fixture
+    __init__.py             <-- already exists
+    conftest.py             <-- shared fixtures (pygame_init, game)
+    test_settings.py        <-- 2 tests, no pygame dependency
+    test_ship.py            <-- 2 tests, uses game fixture
+    test_bullet.py          <-- 2 tests, uses game fixture
+    test_alien.py           <-- 2 tests, uses game fixture + local alien fixture
+    test_button.py          <-- 1 test,  uses game fixture + local button fixture
+    test_alien_invasion.py  <-- 4 tests, uses game fixture
 ```
 
 ## Build Order
@@ -671,8 +1144,12 @@ the previous one:
    and conditional logic.
 4. **test_bullet.py** — tests object relationships (bullet-to-ship) and
    state changes over time.
-5. **test_alien_invasion.py** — integration tests. Verifies the pieces
-   fit together and business rules hold.
+5. **test_alien.py** — tests a predicate method and starting position.
+   Introduces local fixtures and boundary value testing.
+6. **test_button.py** — tests layout relationships rather than raw values.
+   Introduces the idea that some bugs are silent (no crash, just wrong).
+7. **test_alien_invasion.py** — integration tests. Verifies all pieces fit
+   together, business rules hold, and branching game-over logic works.
 
 ## Running the Tests
 
