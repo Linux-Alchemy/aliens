@@ -17,6 +17,7 @@ class Scoreboard():
         # Initial score
         self.prep_score()
         self.prep_high_score()
+        self.prep_level()
 
     def prep_high_score(self) -> None:
         """Render the high score as an image then center it"""
@@ -38,10 +39,21 @@ class Scoreboard():
         self.score_rect.right = self.screen_rect.right - 20
         self.score_rect.top = self.screen_rect.top + 20
 
+    def prep_level(self) -> None:
+        """Render the level indicator as an image"""
+        level_str = str(self.stats.level)
+        self.level_image = self.font.render(level_str, True, self.text_color, self.settings.bg_color)
+
+        # Position the level indicator below the score
+        self.level_rect = self.level_image.get_rect()
+        self.level_rect.right = self.screen_rect.right
+        self.level_rect.top = self.stats.score_rect.bottom + 10
+
     def show_score(self) -> None:
-        """Drawing the score on the screen"""
+        """Drawing the score, highscore and level on the screen"""
         self.screen.blit(self.score_image, self.score_rect)
         self.screen.blit(self.high_score_image, self.high_score_rect)
+        self.screen.blit(self.level_image, self.level_rect)
 
     def check_high_score(self) -> None:
         """Look to see if there's a new high score"""

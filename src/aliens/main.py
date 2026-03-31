@@ -155,12 +155,16 @@ class AlienInvasion():
             for aliens in collisions.values():
                 self.stats.score += self.settings.alien_points * len(aliens)
             self.sb.prep_score()
+            self.sb.check_high_score()
 
         # repopulate alien fleet when one is destoyed
         if not self.aliens:
             self.bullets.empty()
             self._create_fleet()
             self.settings.increase_speed()
+            # increase the level
+            self.stats.level += 1
+            self.sb.prep_level()
 
 
     # EVENTS
@@ -204,6 +208,7 @@ class AlienInvasion():
             # Reset the stats for a new game
             self.stats.reset_stats()
             self.sb.prep_score()
+            self.sb.prep_level()
             self.game_active = True
             pygame.mouse.set_visible(False)
 
