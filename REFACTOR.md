@@ -4,43 +4,102 @@ A running list of code improvements to make before showcasing this project.
 
 ---
 
-## `main.py` — Input Handling
+## UI Flow — Intro / Landing Screen
 
-### [ ] Consolidate `_check_key_down` / `_check_key_up` into a single movement handler
+### [ ] Add a dedicated intro screen before gameplay starts
 
-**Current problem:**
-`_check_key_down` and `_check_key_up` both contain identical condition blocks
-(`if event.key == pygame.K_RIGHT / K_LEFT`) with only `True`/`False` differing.
-This is ambiguous at a glance and looks like a copy-paste bug.
+**What to investigate:**
+Right now the game starts from the main gameplay screen with a Play button drawn on top when
+`game_active` is `False`. For a portfolio version, it may be cleaner to separate this into a
+proper intro/landing screen that shows the game title, some ASCII-style title art, and the
+Play button before switching to the actual gameplay screen.
 
 **Proposed change:**
-Replace the two movement-related checks with a single method:
+Introduce a simple screen-state variable such as `current_screen` or `game_state`, then route
+both drawing and event handling through that state. Rough shape:
 
 ```python
-def _handle_movement_key(self, event, is_pressed: bool) -> None:
-    """Set ship movement state on key press or release"""
-    if event.key == pygame.K_RIGHT:
-        self.ship.moving_right = is_pressed
-    elif event.key == pygame.K_LEFT:
-        self.ship.moving_left = is_pressed
+self.current_screen = "intro"
 ```
 
-Call it from `_check_events` with explicit intent:
+Then have `_update_screen()` delegate based on state:
 
 ```python
-elif event.type == pygame.KEYDOWN:
-    self._check_key_down(event)           # handles space, q, etc.
-    self._handle_movement_key(event, True)
-elif event.type == pygame.KEYUP:
-    self._handle_movement_key(event, False)
+if self.current_screen == "intro":
+    self._draw_intro_screen()
+elif self.current_screen == "playing":
+    self._draw_gameplay_screen()
 ```
 
-Delete `_check_key_up` entirely.
+Likewise in `_check_events()`, only check the Play button when on the intro screen. Clicking
+Play would switch the state to `"playing"` and call the extracted game-start logic.
 
 **Notes / watch-outs:**
-- `_check_key_down` still needs to exist for non-movement keys (`K_SPACE`, `K_q`) — don't fold those into `_handle_movement_key`.
-- Check tests for any direct calls to `_check_key_up` — if tests are simulating key release events by calling it directly, they'll need updating to simulate a `KEYUP` event through `_check_events` instead, or call `_handle_movement_key(event, False)` directly.
-- Verify `ship.moving_right` and `ship.moving_left` still behave correctly in `ship.py`'s `update()` method after the rename — the flags themselves don't change, only how they're set.
+- This is a good argument for extracting `_start_game()` out of `_check_play_button()` first,
+  so the intro screen only needs to trigger one clean method instead of duplicating reset logic.
+- `game_active` and `current_screen` are not quite the same job. Decide whether to keep both
+  (`current_screen` for UI flow, `game_active` for simulation running) or collapse them into
+  a single state system so the code doesn't end up with two clocks telling different lies.
+- ASCII title art in pygame won't be true terminal ASCII art unless rendered line by line with
+  a monospace font. That is fine, just worth knowing so expectations stay tethered to Earth.
+- If you later add pause or game-over screens, a state-based layout scales much better than
+  scattering `if not self.game_active` checks through the render path.
+
+---
+
+## Sound — `pygame.mixer`
+
+### [ ] Look into adding sound effects via `pygame.mixer`
+
+**What to investigate:**
+`pygame.mixer` is the standard pygame module for audio. Worth a look to add basic sound effects
+(firing bullets, alien explosions, ship hit, game over).
+
+**Things to look up:**
+- `pygame.mixer.init()` — needs to be called before loading sounds; check whether `pygame.init()`
+  covers it automatically or if it needs explicit init
+- `pygame.mixer.Sound` — loads and plays a sound file (WAV/OGG recommended; MP3 support is patchy)
+- `sound.play()` — plays the sound; returns a `Channel` object if you need to track it
+- `pygame.mixer.music` — separate API for background music (streaming, better for longer tracks)
+- Channel management — `pygame.mixer.set_num_channels()` if you find sounds cutting each other off
+
+**Gotchas to consider:**
+- `pygame.mixer` can fail silently if no audio device is available (headless/CI environments) —
+  worth wrapping init in a try/except so the game doesn't crash just because there's no sound card
+- Sound files aren't included in the repo by default — decide early whether to bundle assets or
+  keep them out of version control (add to `.gitignore` if not bundling)
+- Latency: `pygame.mixer` has a buffer that can introduce a small delay; tune with
+  `pygame.mixer.pre_init(frequency, size, channels, buffer)` before `pygame.init()` if shots feel laggy
+- OGG is generally preferred over WAV for size; MP3 can have licensing/patent issues depending on platform
+
+---
+
+## High Score — Persisting to File
+
+### [ ] Look into saving the high score between sessions
+
+**What to investigate:**
+Currently scores reset when the game closes. Worth adding basic persistence so the high score
+survives between sessions — simplest approach is a plain text or JSON file.
+
+**Things to look up:**
+- `pathlib.Path` — cleaner than `os.path` for building the save file location
+- `json.dump` / `json.load` — easy if you want to store more than just the score later
+  (level reached, date, etc.); overkill for a single int but scales well
+- Where to save: `~/.local/share/aliens/` is the conventional XDG location on Linux;
+  alternatively just drop a `highscore.txt` next to the game for simplicity
+- `GameStats` is the natural home for load/save logic since it already owns `score` and `high_score`
+
+**Gotchas to consider:**
+- File may not exist on first run — handle `FileNotFoundError` gracefully and default to `0`
+- File could be corrupted or contain garbage — validate the loaded value before trusting it
+  (at minimum check it's a non-negative integer)
+- Don't save on every score update — only write when a new high score is actually set, to avoid
+  hammering the disk every frame
+- If the save path is outside the repo, make sure it's created if it doesn't exist
+  (`Path.mkdir(parents=True, exist_ok=True)`)
+- Consider whether the high score should reset if the player uninstalls — probably yes,
+  so keeping it in `~/.local/share/` rather than bundled with the game is the right call
 
 ---
 

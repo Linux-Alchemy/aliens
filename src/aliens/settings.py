@@ -25,6 +25,10 @@ class Settings():
         self.speed_scale: float = 1.1
         self.initialize_dynamic_settings()
 
+        # Scoring settings
+        self.alien_points: int = 50
+
+
     def initialize_dynamic_settings(self) -> None:
         """Managing the settings that will change in the game as you level up"""
         self.ship_speed: float = 2.0
@@ -38,4 +42,5 @@ class Settings():
         self.ship_speed *= self.speed_scale
         self.bullet_speed *= self.speed_scale
         self.alien_speed *= self.speed_scale
+
 
