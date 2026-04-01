@@ -2,15 +2,16 @@
 
 import pygame
 from pathlib import Path
-
+from pygame.sprite import Sprite
 
 ship_image = Path(__file__).parent.parent.parent/"assets"/"ship2.jpg"
 
-class Ship():
+class Ship(Sprite):
     """Blueprints for the hero ship"""
 
     def __init__(self, ai_game) -> None:
         """Initializing the ship and starting position"""
+        super().__init__()
         self.screen = ai_game.screen
         self.settings = ai_game.settings
         self.screen_rect = ai_game.screen.get_rect()

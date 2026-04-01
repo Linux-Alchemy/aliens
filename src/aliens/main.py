@@ -57,6 +57,7 @@ class AlienInvasion():
         """Decrement ship count when ship is destroyed and clear game board"""
         if self.stats.ships_left > 0:
             self.stats.ships_left -= 1
+            self.sb.prep_ships()
             self.bullets.empty()
             self.aliens.empty()
             # Create a new fleet and ship from starting positon
@@ -74,7 +75,7 @@ class AlienInvasion():
         new_alien = Alien(self)
         new_alien.x = x_position
         new_alien.rect.x = x_position
-        new_alien.rect.y = y_position
+        new_alien.rect.y = y_position 
         self.aliens.add(new_alien)
 
     def _create_fleet(self) -> None:
@@ -82,7 +83,7 @@ class AlienInvasion():
         alien = Alien(self)
         alien_width, alien_height = alien.rect.size
 
-        current_x, current_y = alien_width, alien_height
+        current_x, current_y = alien_width, alien_height * 2
         row_count = 0
         while current_y < (self.settings.screen_height - 3 * alien_height) and row_count < self.settings.fleet_rows:
             while current_x < (self.settings.screen_width - 2 * alien_width):
@@ -209,6 +210,7 @@ class AlienInvasion():
             self.stats.reset_stats()
             self.sb.prep_score()
             self.sb.prep_level()
+            self.sb.prep_ships()
             self.game_active = True
             pygame.mouse.set_visible(False)
 

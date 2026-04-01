@@ -20,7 +20,7 @@ class Alien(Sprite):
 
         # Setting starting position
         self.rect.x = self.rect.width
-        self.rect.y = self.rect.height
+        self.rect.y = self.rect.height * 2
         self.x = float(self.rect.x)
 
     def edge_check(self) -> bool:
