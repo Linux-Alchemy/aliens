@@ -1,154 +1,305 @@
-# Refactor TODO List
+# Refactor Guide — Alien Invasion Polish
 
-A running list of code improvements to make before showcasing this project.
+Three improvements that go beyond the book. Each one introduces a concept you haven't
+used yet. The goal is to *understand what you're doing* while you do it — not to spend
+three days on it. Follow the TODOs in order; the pseudo-code tells you the shape, the
+real snippets tell you the syntax.
 
 ---
 
-## UI Flow — Intro / Landing Screen
+## 1. Intro / Landing Screen
 
-### [ ] Add a dedicated intro screen before gameplay starts
+### What you're building
+A proper title screen before gameplay starts. Right now the Play button floats on top
+of the game world — fine for a tutorial, a bit rough for a portfolio. A dedicated intro
+screen makes the game feel finished.
 
-**What to investigate:**
-Right now the game starts from the main gameplay screen with a Play button drawn on top when
-`game_active` is `False`. For a portfolio version, it may be cleaner to separate this into a
-proper intro/landing screen that shows the game title, some ASCII-style title art, and the
-Play button before switching to the actual gameplay screen.
-
-**Proposed change:**
-Introduce a simple screen-state variable such as `current_screen` or `game_state`, then route
-both drawing and event handling through that state. Rough shape:
+### New concept: game state
+This is your first mini state machine. Instead of a single `game_active` boolean,
+you'll track *where in the game you are* with a string:
 
 ```python
-self.current_screen = "intro"
+# In AlienInvasion.__init__():
+self.game_state = "intro"   # other values: "playing", "game_over"
 ```
 
-Then have `_update_screen()` delegate based on state:
+Then `_update_screen()` and `_check_events()` route based on that value instead of
+checking `game_active` everywhere.
+
+> **Why bother?** One boolean can only mean "on or off". A state string can mean
+> intro, playing, paused, game_over — and your drawing/event logic stays clean because
+> each state only does its own job. This is how almost every game engine works at scale.
+
+---
+
+### TODOs
+
+**Step 1 — add the state variable**
+- [ ] In `__init__`, replace `self.game_active = False` with `self.game_state = "intro"`
+- [ ] Anywhere in the code that reads `self.game_active`, update it to check
+      `self.game_state == "playing"` instead
+
+**Step 2 — write `_draw_intro_screen()`**
+
+This method draws the title and the Play button onto a blank screen. You already know
+how to render text (`Scoreboard` does it) and draw the button. You're just combining
+those ideas here:
 
 ```python
-if self.current_screen == "intro":
-    self._draw_intro_screen()
-elif self.current_screen == "playing":
-    self._draw_gameplay_screen()
+def _draw_intro_screen(self) -> None:
+    # fill the screen with the background colour
+    # create a font — pygame.font.SysFont(None, size) works fine
+    # render a title string as an image surface
+    # position that surface near the top-centre of the screen
+    # blit it to self.screen
+    # draw the play button (you already have self.play_button.draw_button())
 ```
 
-Likewise in `_check_events()`, only check the Play button when on the intro screen. Clicking
-Play would switch the state to `"playing"` and call the extracted game-start logic.
+The only new thing here is positioning. `pygame.font.SysFont(None, 72)` gives you a
+big font. To centre text horizontally, get the rect from the rendered surface and set
+`rect.centerx = self.screen_rect.centerx`. Vertical position: set `rect.top` to
+something like `self.screen_rect.height // 4`.
 
-**Notes / watch-outs:**
-- This is a good argument for extracting `_start_game()` out of `_check_play_button()` first,
-  so the intro screen only needs to trigger one clean method instead of duplicating reset logic.
-- `game_active` and `current_screen` are not quite the same job. Decide whether to keep both
-  (`current_screen` for UI flow, `game_active` for simulation running) or collapse them into
-  a single state system so the code doesn't end up with two clocks telling different lies.
-- ASCII title art in pygame won't be true terminal ASCII art unless rendered line by line with
-  a monospace font. That is fine, just worth knowing so expectations stay tethered to Earth.
-- If you later add pause or game-over screens, a state-based layout scales much better than
-  scattering `if not self.game_active` checks through the render path.
+**Step 3 — update `_update_screen()`**
 
----
+Route drawing through the state:
 
-## Sound — `pygame.mixer`
+```python
+def _update_screen(self) -> None:
+    self.screen.fill(self.settings.bg_color)
 
-### [ ] Look into adding sound effects via `pygame.mixer`
+    if self.game_state == "intro":
+        self._draw_intro_screen()
+    elif self.game_state == "playing":
+        # everything that was already here: bullets, ship, aliens, scoreboard
+        ...
 
-**What to investigate:**
-`pygame.mixer` is the standard pygame module for audio. Worth a look to add basic sound effects
-(firing bullets, alien explosions, ship hit, game over).
+    pygame.display.flip()
+```
 
-**Things to look up:**
-- `pygame.mixer.init()` — needs to be called before loading sounds; check whether `pygame.init()`
-  covers it automatically or if it needs explicit init
-- `pygame.mixer.Sound` — loads and plays a sound file (WAV/OGG recommended; MP3 support is patchy)
-- `sound.play()` — plays the sound; returns a `Channel` object if you need to track it
-- `pygame.mixer.music` — separate API for background music (streaming, better for longer tracks)
-- Channel management — `pygame.mixer.set_num_channels()` if you find sounds cutting each other off
+**Step 4 — update `_check_events()`**
 
-**Gotchas to consider:**
-- `pygame.mixer` can fail silently if no audio device is available (headless/CI environments) —
-  worth wrapping init in a try/except so the game doesn't crash just because there's no sound card
-- Sound files aren't included in the repo by default — decide early whether to bundle assets or
-  keep them out of version control (add to `.gitignore` if not bundling)
-- Latency: `pygame.mixer` has a buffer that can introduce a small delay; tune with
-  `pygame.mixer.pre_init(frequency, size, channels, buffer)` before `pygame.init()` if shots feel laggy
-- OGG is generally preferred over WAV for size; MP3 can have licensing/patent issues depending on platform
-
----
-
-## High Score — Persisting to File
-
-### [ ] Look into saving the high score between sessions
-
-**What to investigate:**
-Currently scores reset when the game closes. Worth adding basic persistence so the high score
-survives between sessions — simplest approach is a plain text or JSON file.
-
-**Things to look up:**
-- `pathlib.Path` — cleaner than `os.path` for building the save file location
-- `json.dump` / `json.load` — easy if you want to store more than just the score later
-  (level reached, date, etc.); overkill for a single int but scales well
-- Where to save: `~/.local/share/aliens/` is the conventional XDG location on Linux;
-  alternatively just drop a `highscore.txt` next to the game for simplicity
-- `GameStats` is the natural home for load/save logic since it already owns `score` and `high_score`
-
-**Gotchas to consider:**
-- File may not exist on first run — handle `FileNotFoundError` gracefully and default to `0`
-- File could be corrupted or contain garbage — validate the loaded value before trusting it
-  (at minimum check it's a non-negative integer)
-- Don't save on every score update — only write when a new high score is actually set, to avoid
-  hammering the disk every frame
-- If the save path is outside the repo, make sure it's created if it doesn't exist
-  (`Path.mkdir(parents=True, exist_ok=True)`)
-- Consider whether the high score should reset if the player uninstalls — probably yes,
-  so keeping it in `~/.local/share/` rather than bundled with the game is the right call
-
----
-
-## `main.py` — Game Start
-
-### [ ] Add `p` key as an alternative way to start the game
-
-**Current behaviour:**
-The game starts only via mouse click on the Play button, handled in `_check_play_button(mouse_position)`.
-That method is tightly coupled to the mouse: it checks `collidepoint` on the button rect and bails
-out if `game_active` is already `True`.
-
-**Proposed change:**
-Extract the actual start-game logic out of `_check_play_button` into a dedicated `_start_game` method,
-then call it from both the mouse handler and the new keypress handler:
+The Play button click currently calls `_check_play_button()`. That method sets
+`game_active = True` and resets everything. Rename/refactor it to `_start_game()` and
+have it set `self.game_state = "playing"` instead:
 
 ```python
 def _start_game(self) -> None:
-    """Reset state and activate the game"""
-    self.stats.reset_stats()
-    self.game_active = True
-    pygame.mouse.set_visible(False)
-    self.bullets.empty()
-    self.aliens.empty()
-    self._create_fleet()
-    self.ship.center_ship()
+    self.game_state = "playing"
+    self.settings.initialize_dynamic_settings()
+    # reset stats, clear bullets, clear aliens, create fleet, center ship
+    # hide the mouse cursor
+    ...
+```
 
-def _check_play_button(self, mouse_position) -> None:
-    """Start the game when the Play button is clicked"""
-    button_clicked = self.play_button.rect.collidepoint(mouse_position)
-    if button_clicked and not self.game_active:
+Then in `_check_events()`:
+
+```python
+# inside the MOUSEBUTTONDOWN branch:
+if self.game_state == "intro":
+    mouse_pos = pygame.mouse.get_pos()
+    if self.play_button.rect.collidepoint(mouse_pos):
         self._start_game()
 ```
 
-Then in `_check_key_down`, add:
+### Watch-outs
+- Don't leave any stray `self.game_active` references — do a quick search after
+  you're done (`grep -n "game_active" src/aliens/main.py`)
+- The scoreboard's `show_score()` should only be called during `"playing"` state,
+  otherwise it'll try to draw a score on the intro screen
+
+---
+
+## 2. Sound Effects — `pygame.mixer`
+
+### What you're building
+Three sound effects: bullet fired, alien destroyed, ship hit. That's enough to make
+the game feel alive without going overboard.
+
+### New concept: `pygame.mixer`
+Pygame has a dedicated audio module. You load a sound file once (at init), then call
+`.play()` on it whenever you need it. The module handles the rest.
 
 ```python
-elif event.key == pygame.K_p and not self.game_active:
-    self._start_game()
+# Load once — cheap after the first time
+shoot_sound = pygame.mixer.Sound("assets/shoot.wav")
+
+# Play on demand — very cheap
+shoot_sound.play()
 ```
 
-**Notes / watch-outs:**
-- The `and not self.game_active` guard on the keypress is critical — without it, hitting `p`
-  mid-game will reset everything (bullets, aliens, ship position) while the game is already running.
-  The mouse path already has this guard via `collidepoint`; the keyboard path needs it explicitly.
-- `pygame.mouse.set_visible(False)` lives inside `_start_game` now — make sure it isn't also
-  left behind in `_check_play_button` after the refactor, or you'll call it twice (harmless but messy).
-- If you later add a pause feature, `p` is an obvious candidate for that too. Decide now whether
-  `p` = "play/unpause" or keep them as separate keys to avoid a confusing double-duty binding.
-- Update any tests that call `_check_play_button` directly to either call `_start_game` or go
-  through the full mouse event path — they'll still work but the test intent may be clearer if
-  pointed at `_start_game`.
+### Getting sound files
+You need `.wav` or `.ogg` files (avoid MP3 — patchy support). Free options:
+- **freesound.org** — search "laser", "explosion", "boom"; filter by licence CC0
+- **kenney.nl/assets** — has entire free game audio packs, no attribution needed
+
+Download 3 files and drop them in your `assets/` folder.
+
+---
+
+### TODOs
+
+**Step 1 — init the mixer**
+
+`pygame.init()` usually covers this, but it's good practice to be explicit. Add this
+*before* `pygame.init()` in `AlienInvasion.__init__()`:
+
+```python
+pygame.mixer.pre_init(44100, -16, 2, 512)
+```
+
+The last argument (512) is the buffer size — smaller = less latency on sound effects.
+
+**Step 2 — load sounds in `__init__`**
+
+After `pygame.init()`, load your files. Wrap it so the game doesn't crash if audio
+isn't available (e.g. running tests headlessly):
+
+```python
+try:
+    self.shoot_sound = pygame.mixer.Sound("assets/shoot.wav")
+    self.explosion_sound = pygame.mixer.Sound("assets/explosion.wav")
+    self.ship_hit_sound = pygame.mixer.Sound("assets/ship_hit.wav")
+    self.sounds_enabled = True
+except pygame.error:
+    self.sounds_enabled = False
+```
+
+**Step 3 — play sounds at the right moments**
+
+Find each relevant method and add a play call:
+
+```python
+# In _fire_bullet():
+if self.sounds_enabled:
+    self.shoot_sound.play()
+
+# In _check_bullet_alien_collisions(), inside the `if collisions:` block:
+# play explosion sound
+
+# In _ship_hit():
+# play ship hit sound
+```
+
+**Step 4 — add assets to `.gitignore` (optional)**
+
+If you don't want to bundle the audio files in the repo, add this to `.gitignore`:
+
+```
+assets/*.wav
+assets/*.ogg
+```
+
+If you *do* want them in the repo (simpler for a portfolio), skip this step and just
+commit them. Either is fine.
+
+### Watch-outs
+- `pygame.mixer.Sound()` takes a path string or `Path` object — either works
+- Volume is 0.0–1.0; `sound.set_volume(0.5)` if anything is too loud
+- If you hear sounds cutting each other off when many aliens die at once,
+  look up `pygame.mixer.set_num_channels()` — default is 8, usually enough
+
+---
+
+## 3. Persist the High Score
+
+### What you're building
+Save the high score to a file when it's beaten, load it back when the game starts.
+Currently every session starts from zero — this fixes that.
+
+### New concepts: `pathlib` and `json`
+
+`pathlib.Path` is the modern way to work with file paths in Python. It's cleaner than
+string concatenation and works the same on every OS:
+
+```python
+from pathlib import Path
+
+save_path = Path("~/.local/share/aliens/highscore.json").expanduser()
+```
+
+`json` turns Python values into text and back — simple:
+
+```python
+import json
+
+# Writing
+with open(save_path, 'w') as f:
+    json.dump({"high_score": 1500}, f)
+
+# Reading
+with open(save_path, 'r') as f:
+    data = json.load(f)
+    score = data["high_score"]
+```
+
+---
+
+### TODOs
+
+**Step 1 — add load/save to `GameStats`**
+
+`GameStats` already owns `high_score`, so this is the natural home. Add two methods:
+
+```python
+def load_high_score(self) -> None:
+    # build the path using Path("~/.local/share/aliens/highscore.json").expanduser()
+    # if the file exists, open it and read the high_score value
+    # if the file doesn't exist (FileNotFoundError), set self.high_score = 0
+    # if the value loaded isn't a valid non-negative int, default to 0
+
+def save_high_score(self) -> None:
+    # build the same path
+    # make sure the parent directory exists: path.parent.mkdir(parents=True, exist_ok=True)
+    # write {"high_score": self.high_score} as JSON
+```
+
+The only genuinely new syntax here is `Path` and `json`. The logic is just an
+if/else wrapped in a try/except — nothing you haven't seen.
+
+**Step 2 — call `load_high_score()` at startup**
+
+In `GameStats.__init__()`, after `self.high_score = 0`, replace that line with a call
+to `self.load_high_score()`. This means the first thing the game does is check whether
+there's a saved score:
+
+```python
+def __init__(self, ai_game) -> None:
+    self.settings = ai_game.settings
+    self.reset_stats()
+    self.load_high_score()   # replaces self.high_score = 0
+```
+
+**Step 3 — call `save_high_score()` when a new high score is set**
+
+This already happens in one place: `Scoreboard.check_high_score()`. Add the save call
+there:
+
+```python
+def check_high_score(self) -> None:
+    if self.stats.score > self.stats.high_score:
+        self.stats.high_score = self.stats.score
+        self.prep_high_score()
+        self.stats.save_high_score()    # add this line
+```
+
+That's it. Don't save anywhere else — you don't need to.
+
+### Watch-outs
+- `Path.expanduser()` is what turns `~` into `/home/yourname/` — don't forget it
+- `mkdir(parents=True, exist_ok=True)` won't crash if the directory already exists;
+  that's the whole point of `exist_ok=True`
+- After loading, validate the value: `if isinstance(score, int) and score >= 0` before
+  assigning it. Someone (future you) might edit the file manually and break it
+
+---
+
+## Order of attack
+
+Do them in this order — each one is independent, but this sequence keeps the changes
+small and testable:
+
+1. **High score persistence** — pure Python, no pygame, easiest win
+2. **Sound effects** — isolated additions, nothing existing changes
+3. **Intro screen** — most invasive (touches `_update_screen` and `_check_events`),
+   do it last so you're not debugging state changes on top of new audio code
