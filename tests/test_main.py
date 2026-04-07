@@ -31,3 +31,12 @@ def test_bullet_max_count(pygame_game) -> None:
     pygame_game._fire_bullet()
     assert len(pygame_game.bullets) == max_bullets
 
+def test_game_starts_inactive(pygame_game) -> None:
+    """Verify that the game starts in inactive state"""
+    assert not pygame_game.game_active
+
+def test_alien_fleet_not_empty(pygame_game) -> None:
+    """Verify that the fleet is created and not empty"""
+    assert len(pygame_game.aliens) > 0
+
+
