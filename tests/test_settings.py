@@ -27,8 +27,19 @@ def test_default_bullet_settings(defaults) -> None:
     Args:
         settings: A Settings instance"""
     b = defaults
-    assert b.bullet_speed == 3
+    assert b.bullet_speed == 4
     assert b.bullet_width == 3
     assert b.bullet_height == 15
-    assert b.bullet_color == (60, 60, 60)
+    assert b.bullet_color == (135, 206, 235)
     assert b.bullet_max_count == 10
+
+def test_increase_speed(defaults) -> None:
+    """Verifythat speed increases correctly"""
+    initial_bullet_speed = defaults.bullet_speed
+    initial_ship_speed = defaults.ship_speed
+    initial_alien_speed = defaults.alien_speed
+    defaults.increase_speed()
+    assert defaults.bullet_speed > initial_bullet_speed
+    assert defaults.ship_speed > initial_ship_speed
+    assert defaults.alien_speed > initial_alien_speed
+
