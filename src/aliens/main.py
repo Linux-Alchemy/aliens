@@ -33,7 +33,7 @@ class AlienInvasion():
         self._create_fleet()
 
         # Setting game status to inactive in order to use the button to start
-        self.game_active = False
+        self.game_state = "intro"
         self.play_button = Button(self, "Play")
 
 
@@ -42,7 +42,7 @@ class AlienInvasion():
         """Start the main game loop"""
         while True:
             self._check_events()
-            if self.game_active:
+            if self.game_state == "playing":
                 self.ship.update()
                 self._update_bullets()
                 self._update_aliens()
