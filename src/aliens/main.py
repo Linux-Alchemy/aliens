@@ -66,7 +66,7 @@ class AlienInvasion():
             # Pause
             sleep(0.5)
         else:
-            self.game_active = False
+            self.game_state = "intro"
             pygame.mouse.set_visible(True)
 
     # MANAGEMENT FOR THE ALIEN SCUM
@@ -204,14 +204,14 @@ class AlienInvasion():
     def _check_play_button(self, mouse_position) -> None:
         """Start the game when the button is pressed"""
         button_clicked = self.play_button.rect.collidepoint(mouse_position)
-        if button_clicked and not self.game_active:
+        if button_clicked and not self.game_state == "playing":
             self.settings.initialize_dynamic_settings()
             # Reset the stats for a new game
             self.stats.reset_stats()
             self.sb.prep_score()
             self.sb.prep_level()
             self.sb.prep_ships()
-            self.game_active = True
+            self.game_state = "playing"
             pygame.mouse.set_visible(False)
 
             # Clear out remaining bullets/aliens and create a new board with a new ship and alien fleet
@@ -222,6 +222,19 @@ class AlienInvasion():
 
 
     # SCREEN UPDATES AND DRAWING ELEMENTS
+    def _draw_intro_screen(self) -> None:
+        """Drawing the main welcome screen before that game starts"""
+        self.screen.fill(self.settings.bg_color)
+        self.font = pygame.font.SysFont(None, 72)
+        self.text_color: tuple[int, int, int] = (255, 255, 255)
+        game_title = "Alien Invasion!"
+        self.title_image = self.font.render(game_title, True, self.text_color, self.settings.bg_color)
+        self.title_rect = self.title_image.get_rect()
+        self.title_rect.top = self.screen.get_rect().top
+        self.screen.blit(self.title_image, self.title_rect)
+        self.play_button.draw_button()
+
+
     def _update_screen(self) -> None:
         """Update the screen and draw images"""
         self.screen.fill(self.settings.bg_color)
@@ -231,7 +244,7 @@ class AlienInvasion():
         self.ship.blit_ship()
         self.aliens.draw(self.screen)
         self.sb.show_score()
-        if not self.game_active:
+        if not self.game_state == "playing":
             self.play_button.draw_button()
         pygame.display.flip()
 
