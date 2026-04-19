@@ -33,10 +33,42 @@ def test_bullet_max_count(pygame_game) -> None:
 
 def test_game_starts_inactive(pygame_game) -> None:
     """Verify that the game starts in inactive state"""
-    assert not pygame_game.game_active
+    assert pygame_game.game_state == "intro"
 
 def test_alien_fleet_not_empty(pygame_game) -> None:
     """Verify that the fleet is created and not empty"""
     assert len(pygame_game.aliens) > 0
 
+def test_intro_ignores_gameplay_keydown(monkeypatch, pygame_game) -> None:
+    """Verify intro state does not forward gameplay key presses"""
+    keydown_event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT)
+    handled_events = []
+
+    monkeypatch.setattr(pygame.event, "get", lambda: [keydown_event])
+    monkeypatch.setattr(
+        pygame_game,
+        "_check_key_down",
+        lambda event: handled_events.append(event),
+    )
+
+    pygame_game._check_events()
+
+    assert handled_events == []
+
+def test_playing_forwards_gameplay_keydown(monkeypatch, pygame_game) -> None:
+    """Verify playing state forwards gameplay key presses to the handler"""
+    keydown_event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT)
+    handled_events = []
+    pygame_game.game_state = "playing"
+
+    monkeypatch.setattr(pygame.event, "get", lambda: [keydown_event])
+    monkeypatch.setattr(
+        pygame_game,
+        "_check_key_down",
+        lambda event: handled_events.append(event),
+    )
+
+    pygame_game._check_events()
+
+    assert handled_events == [keydown_event]
 

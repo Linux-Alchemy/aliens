@@ -177,9 +177,6 @@ class AlienInvasion():
             self.ship.moving_left = True
         elif event.key == pygame.K_SPACE:
             self._fire_bullet()
-        # option to quit game with 'q'
-        elif event.key == pygame.K_q:
-            sys.exit()
 
     def _check_key_up(self,event) -> None:
         """Listen for key release -- """
@@ -194,12 +191,16 @@ class AlienInvasion():
             if event.type == pygame.QUIT:
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                self._check_key_down(event)
+                if event.key == pygame.K_q:
+                    sys.exit()
+                elif self.game_state == "playing":
+                    self._check_key_down(event)
             elif event.type == pygame.KEYUP:
                 self._check_key_up(event)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_position = pygame.mouse.get_pos()
-                self._check_play_button(mouse_position)
+                if self.game_state == "intro":
+                    mouse_position = pygame.mouse.get_pos()
+                    self._check_play_button(mouse_position)
 
     def _check_play_button(self, mouse_position) -> None:
         """Start the game when the button is pressed"""
@@ -257,5 +258,4 @@ class AlienInvasion():
 if __name__ == '__main__':
     ai = AlienInvasion()
     ai.run_game()
-
 
