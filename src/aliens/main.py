@@ -230,7 +230,8 @@ class AlienInvasion():
         game_title = "Alien Invasion!"
         self.title_image = self.font.render(game_title, True, self.text_color, self.settings.bg_color)
         self.title_rect = self.title_image.get_rect()
-        self.title_rect.top = self.screen.get_rect().top
+        self.title_rect.centerx = self.screen.get_rect().centerx
+        self.title_rect.top = self.screen.get_rect().height // 4
         self.screen.blit(self.title_image, self.title_rect)
         self.play_button.draw_button()
 
@@ -238,14 +239,18 @@ class AlienInvasion():
     def _update_screen(self) -> None:
         """Update the screen and draw images"""
         self.screen.fill(self.settings.bg_color)
-        for bullet in self.bullets.sprites():
-            bullet.draw_bullet()
-        # call blit_ship() to actually draw the ship on the gameboard
-        self.ship.blit_ship()
-        self.aliens.draw(self.screen)
-        self.sb.show_score()
-        if not self.game_state == "playing":
-            self.play_button.draw_button()
+
+        if self.game_state == "intro":
+            self._draw_intro_screen()
+        elif self.game_state == "playing":
+            
+            for bullet in self.bullets.sprites():
+                bullet.draw_bullet()
+            # call blit_ship() to actually draw the ship on the gameboard
+            self.ship.blit_ship()
+            self.aliens.draw(self.screen)
+            self.sb.show_score()
+
         pygame.display.flip()
 
 

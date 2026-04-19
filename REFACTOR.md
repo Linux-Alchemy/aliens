@@ -1,68 +1,194 @@
-# Refactor Guide — Alien Invasion Polish
+# Refactor Guide — Alien Invasion Final Polish
 
-Three improvements that go beyond the book. Each one introduces a concept you haven't
-used yet. The goal is to *understand what you're doing* while you do it — not to spend
-three days on it. Follow the TODOs in order; the pseudo-code tells you the shape, the
-real snippets tell you the syntax.
+This file now reflects the project as it actually stands, not as it once imagined itself in a more innocent age.
+
+The plan has been trimmed to the work that is still relevant:
+- Sound effects are off the list.
+- High score persistence is already working.
+- The main remaining feature is finishing the intro / landing screen properly.
+- After that, there is one small cleanup pass to bring tests and notes into line with the new state-based flow.
 
 ---
 
-## 1. Intro / Landing Screen
+## Current Snapshot
 
-### What you're building
-A proper title screen before gameplay starts. Right now the Play button floats on top
-of the game world — fine for a tutorial, a bit rough for a portfolio. A dedicated intro
-screen makes the game feel finished.
+### Already done
 
-### New concept: game state
-This is your first mini state machine. Instead of a single `game_active` boolean,
-you'll track *where in the game you are* with a string:
+The refactor has already started. These pieces are in place:
 
 ```python
-# In AlienInvasion.__init__():
-self.game_state = "intro"   # other values: "playing", "game_over"
+# In AlienInvasion.__init__()
+self.game_state = "intro"
+self.play_button = Button(self, "Play")
 ```
 
-Then `_update_screen()` and `_check_events()` route based on that value instead of
-checking `game_active` everywhere.
+```python
+# In run_game()
+if self.game_state == "playing":
+    self.ship.update()
+    self._update_bullets()
+    self._update_aliens()
+```
 
-> **Why bother?** One boolean can only mean "on or off". A state string can mean
-> intro, playing, paused, game_over — and your drawing/event logic stays clean because
-> each state only does its own job. This is how almost every game engine works at scale.
+```python
+# In _ship_hit()
+else:
+    self.game_state = "intro"
+    pygame.mouse.set_visible(True)
+```
+
+```python
+# In GameStats.__init__()
+self.reset_stats()
+self.get_high_score()
+```
+
+```python
+# In Scoreboard.check_high_score()
+if self.stats.score > self.stats.high_score:
+    self.stats.high_score = self.stats.score
+    self.prep_high_score()
+    self.stats.save_high_score()
+```
+
+So the project already has:
+- a `game_state` string instead of the old `game_active` boolean
+- a Play button
+- a path back to the intro state after game over
+- high score load/save behaviour
+
+### Still not finished
+
+The intro page is not working yet because the wiring is incomplete:
+- `_draw_intro_screen()` exists, but `_update_screen()` never calls it
+- gameplay objects are still drawn during the intro state
+- the scoreboard is still drawn during the intro state
+- mouse and keyboard input are not fully routed by `game_state`
+- the title text in `_draw_intro_screen()` is not centred yet
+- one test and one planning note still refer to `game_active`
+
+Think of it like fitting a new front door but forgetting to tell the house where the hallway is.
 
 ---
 
-### TODOs
+## 1. Finish The Intro / Landing Screen
 
-**Step 1 — add the state variable**
-- [ ] In `__init__`, replace `self.game_active = False` with `self.game_state = "intro"`
-- [ ] Anywhere in the code that reads `self.game_active`, update it to check
-      `self.game_state == "playing"` instead
+### What you're building
 
-**Step 2 — write `_draw_intro_screen()`**
+A proper title screen before gameplay starts.
 
-This method draws the title and the Play button onto a blank screen. You already know
-how to render text (`Scoreboard` does it) and draw the button. You're just combining
-those ideas here:
+Right now the project has the parts for that screen, but the main draw loop still behaves like the old version, so the game world shows up underneath the Play button. The goal here is to make the intro state feel like its own screen, not just the normal game wearing a paper hat.
+
+### Learning goal: a simple state machine
+
+This is a very useful pattern to learn early.
+
+A boolean can only answer one question: on or off.
+
+A state string can answer a better question: where is the game right now?
+
+For this project, that means:
+- `"intro"`: show the landing screen and wait for input
+- `"playing"`: update and draw the real game
+
+That separation is the whole point of this refactor.
+
+### What the code already has
+
+You already added the state variable:
+
+```python
+# In __init__()
+self.game_state = "intro"
+self.play_button = Button(self, "Play")
+```
+
+You already limit gameplay updates to the playing state:
+
+```python
+def run_game(self) -> None:
+    while True:
+        self._check_events()
+        if self.game_state == "playing":
+            self.ship.update()
+            self._update_bullets()
+            self._update_aliens()
+
+        self._update_screen()
+        self.clock.tick(60)
+```
+
+You already wrote an intro drawing helper:
 
 ```python
 def _draw_intro_screen(self) -> None:
-    # fill the screen with the background colour
-    # create a font — pygame.font.SysFont(None, size) works fine
-    # render a title string as an image surface
-    # position that surface near the top-centre of the screen
-    # blit it to self.screen
-    # draw the play button (you already have self.play_button.draw_button())
+    self.screen.fill(self.settings.bg_color)
+    self.font = pygame.font.SysFont(None, 72)
+    self.text_color: tuple[int, int, int] = (255, 255, 255)
+    game_title = "Alien Invasion!"
+    self.title_image = self.font.render(game_title, True, self.text_color, self.settings.bg_color)
+    self.title_rect = self.title_image.get_rect()
+    self.title_rect.top = self.screen.get_rect().top
+    self.screen.blit(self.title_image, self.title_rect)
+    self.play_button.draw_button()
 ```
 
-The only new thing here is positioning. `pygame.font.SysFont(None, 72)` gives you a
-big font. To centre text horizontally, get the rect from the rendered surface and set
-`rect.centerx = self.screen_rect.centerx`. Vertical position: set `rect.top` to
-something like `self.screen_rect.height // 4`.
+You already have a start-game path on button click:
 
-**Step 3 — update `_update_screen()`**
+```python
+def _check_play_button(self, mouse_position) -> None:
+    button_clicked = self.play_button.rect.collidepoint(mouse_position)
+    if button_clicked and not self.game_state == "playing":
+        self.settings.initialize_dynamic_settings()
+        self.stats.reset_stats()
+        self.sb.prep_score()
+        self.sb.prep_level()
+        self.sb.prep_ships()
+        self.game_state = "playing"
+        pygame.mouse.set_visible(False)
 
-Route drawing through the state:
+        self.bullets.empty()
+        self.aliens.empty()
+        self._create_fleet()
+        self.ship.center_ship()
+```
+
+### Why it still does not work
+
+The current draw loop does not actually use the intro state:
+
+```python
+def _update_screen(self) -> None:
+    self.screen.fill(self.settings.bg_color)
+    for bullet in self.bullets.sprites():
+        bullet.draw_bullet()
+    self.ship.blit_ship()
+    self.aliens.draw(self.screen)
+    self.sb.show_score()
+    if not self.game_state == "playing":
+        self.play_button.draw_button()
+    pygame.display.flip()
+```
+
+That means:
+- bullets still draw
+- the ship still draws
+- aliens still draw
+- the scoreboard still draws
+- the intro helper never runs
+
+So the state exists, but the rendering logic has not properly moved over to it yet.
+
+### TODOs
+
+**Step 1 — route `_update_screen()` through `game_state`**
+
+This is the main fix.
+
+The intro state should call `_draw_intro_screen()`.
+The playing state should draw bullets, ship, aliens, and scoreboard.
+
+Target shape:
 
 ```python
 def _update_screen(self) -> None:
@@ -71,235 +197,183 @@ def _update_screen(self) -> None:
     if self.game_state == "intro":
         self._draw_intro_screen()
     elif self.game_state == "playing":
-        # everything that was already here: bullets, ship, aliens, scoreboard
-        ...
+        for bullet in self.bullets.sprites():
+            bullet.draw_bullet()
+        self.ship.blit_ship()
+        self.aliens.draw(self.screen)
+        self.sb.show_score()
 
     pygame.display.flip()
 ```
 
-**Step 4 — update `_check_events()`**
+Why this matters:
+- it finally makes the intro screen real
+- it stops gameplay visuals leaking into the menu state
+- it follows the exact state-machine idea you started already
 
-The Play button click currently calls `_check_play_button()`. That method sets
-`game_active = True` and resets everything. Rename/refactor it to `_start_game()` and
-have it set `self.game_state = "playing"` instead:
+**Step 2 — fix the intro title layout**
 
-```python
-def _start_game(self) -> None:
-    self.game_state = "playing"
-    self.settings.initialize_dynamic_settings()
-    # reset stats, clear bullets, clear aliens, create fleet, center ship
-    # hide the mouse cursor
-    ...
-```
+At the moment the title is rendered, but it is not centred. You create the rect and only set `top`, so it stays at the left edge by default.
 
-Then in `_check_events()`:
+Current line of thinking:
 
 ```python
-# inside the MOUSEBUTTONDOWN branch:
-if self.game_state == "intro":
-    mouse_pos = pygame.mouse.get_pos()
-    if self.play_button.rect.collidepoint(mouse_pos):
-        self._start_game()
+self.title_rect = self.title_image.get_rect()
+self.title_rect.top = self.screen.get_rect().top
 ```
+
+What you want instead is something like:
+
+```python
+self.title_rect = self.title_image.get_rect()
+self.title_rect.centerx = self.screen.get_rect().centerx
+self.title_rect.top = self.screen.get_rect().height // 4
+```
+
+Learning note:
+- `get_rect()` gives you a movable box around the rendered text
+- setting `centerx` centres it horizontally
+- setting `top` places it vertically
+
+This is standard `pygame` positioning, and worth getting comfortable with because you will use it everywhere.
+
+**Step 3 — route mouse clicks by state**
+
+Right now every mouse click gets sent to `_check_play_button()`:
+
+```python
+elif event.type == pygame.MOUSEBUTTONDOWN:
+    mouse_position = pygame.mouse.get_pos()
+    self._check_play_button(mouse_position)
+```
+
+That works, but it is still old-style logic.
+
+What you want is to only treat the click as a Play-button click while in the intro state:
+
+```python
+elif event.type == pygame.MOUSEBUTTONDOWN:
+    if self.game_state == "intro":
+        mouse_position = pygame.mouse.get_pos()
+        self._check_play_button(mouse_position)
+```
+
+This keeps your event handling clean and matches the refactor goal: each state handles its own business.
+
+**Step 4 — stop gameplay input from firing during the intro**
+
+At the moment, key presses still go through `_check_key_down()` regardless of state:
+
+```python
+elif event.type == pygame.KEYDOWN:
+    self._check_key_down(event)
+```
+
+That means movement flags and bullet firing can still be triggered while sitting on the intro screen.
+
+You have a couple of acceptable ways to fix this.
+
+Simplest route:
+- keep `q` as a global quit key
+- only allow movement and shooting when `self.game_state == "playing"`
+
+One possible shape:
+
+```python
+elif event.type == pygame.KEYDOWN:
+    if event.key == pygame.K_q:
+        sys.exit()
+    elif self.game_state == "playing":
+        self._check_key_down(event)
+```
+
+You could also guard inside `_check_key_down()`, but the important thing is the same: intro mode should not behave like gameplay mode.
+
+**Step 5 — test the state flow end to end**
+
+Once the draw and event routing are fixed, check the full loop manually:
+
+1. Start the game.
+2. Confirm you only see the intro screen.
+3. Click Play.
+4. Confirm gameplay appears and the mouse cursor hides.
+5. Lose all ships.
+6. Confirm the game returns to the intro screen and the mouse cursor becomes visible again.
+
+Why this check matters:
+- `_ship_hit()` already sends the game back to `"intro"`
+- once `_update_screen()` is state-based, that path should finally display the correct screen
 
 ### Watch-outs
-- Don't leave any stray `self.game_active` references — do a quick search after
-  you're done (`grep -n "game_active" src/aliens/main.py`)
-- The scoreboard's `show_score()` should only be called during `"playing"` state,
-  otherwise it'll try to draw a score on the intro screen
+
+- Do not leave `self.sb.show_score()` outside the `"playing"` branch
+- Do not leave ship, alien, or bullet drawing outside the `"playing"` branch
+- If the title still looks wrong after centring, print or inspect the rect values rather than guessing
+- You do not have to rename `_check_play_button()` to `_start_game()` unless you want the extra cleanup; the important part is the state-based flow
 
 ---
 
-## 2. Sound Effects — `pygame.mixer`
+## 2. Clean Up The State Refactor
 
-### What you're building
-Three sound effects: bullet fired, alien destroyed, ship hit. That's enough to make
-the game feel alive without going overboard.
+### What this is
 
-### New concept: `pygame.mixer`
-Pygame has a dedicated audio module. You load a sound file once (at init), then call
-`.play()` on it whenever you need it. The module handles the rest.
+This is the short tidy-up pass after the intro screen works.
 
-```python
-# Load once — cheap after the first time
-shoot_sound = pygame.mixer.Sound("assets/shoot.wav")
-
-# Play on demand — very cheap
-shoot_sound.play()
-```
-
-### Getting sound files
-You need `.wav` or `.ogg` files (avoid MP3 — patchy support). Free options:
-- **freesound.org** — search "laser", "explosion", "boom"; filter by licence CC0
-- **kenney.nl/assets** — has entire free game audio packs, no attribution needed
-
-Download 3 files and drop them in your `assets/` folder.
-
----
+The code has moved to `game_state`, but one test and one project note still talk about `game_active`. That is why the test suite currently reports one failure even though the game has mostly moved on.
 
 ### TODOs
 
-**Step 1 — init the mixer**
+**Step 1 — update the stale test**
 
-`pygame.init()` usually covers this, but it's good practice to be explicit. Add this
-*before* `pygame.init()` in `AlienInvasion.__init__()`:
-
-```python
-pygame.mixer.pre_init(44100, -16, 2, 512)
-```
-
-The last argument (512) is the buffer size — smaller = less latency on sound effects.
-
-**Step 2 — load sounds in `__init__`**
-
-After `pygame.init()`, load your files. Wrap it so the game doesn't crash if audio
-isn't available (e.g. running tests headlessly):
+Current test:
 
 ```python
-try:
-    self.shoot_sound = pygame.mixer.Sound("assets/shoot.wav")
-    self.explosion_sound = pygame.mixer.Sound("assets/explosion.wav")
-    self.ship_hit_sound = pygame.mixer.Sound("assets/ship_hit.wav")
-    self.sounds_enabled = True
-except pygame.error:
-    self.sounds_enabled = False
+def test_game_starts_inactive(pygame_game) -> None:
+    assert not pygame_game.game_active
 ```
 
-**Step 3 — play sounds at the right moments**
-
-Find each relevant method and add a play call:
+Replace the idea with the new truth:
 
 ```python
-# In _fire_bullet():
-if self.sounds_enabled:
-    self.shoot_sound.play()
-
-# In _check_bullet_alien_collisions(), inside the `if collisions:` block:
-# play explosion sound
-
-# In _ship_hit():
-# play ship hit sound
+def test_game_starts_in_intro_state(pygame_game) -> None:
+    assert pygame_game.game_state == "intro"
 ```
 
-**Step 4 — add assets to `.gitignore` (optional)**
+This is not just pedantry. Tests are supposed to describe reality. If the test still checks the old API, it is like labelling a cat as “small horse” and then being shocked by the veterinary bill.
 
-If you don't want to bundle the audio files in the repo, add this to `.gitignore`:
+**Step 2 — update `TEST_OUTLINE.md`**
 
-```
-assets/*.wav
-assets/*.ogg
-```
+That note still references `game_active`, so it should either:
+- be updated to `game_state == "intro"`
+- or be removed if the tests it describes are already written
 
-If you *do* want them in the repo (simpler for a portfolio), skip this step and just
-commit them. Either is fine.
+Keep the project notes aligned with the code, otherwise future-you has to do detective work for no reason.
 
-### Watch-outs
-- `pygame.mixer.Sound()` takes a path string or `Path` object — either works
-- Volume is 0.0–1.0; `sound.set_volume(0.5)` if anything is too loud
-- If you hear sounds cutting each other off when many aliens die at once,
-  look up `pygame.mixer.set_num_channels()` — default is 8, usually enough
+**Step 3 — optional small improvement**
+
+Once the intro screen works, consider adding one extra test around state transitions.
+
+Useful examples:
+- clicking Play changes `game_state` from `"intro"` to `"playing"`
+- the game starts in `"intro"`
+
+This is optional, but it would be a good learning exercise because state transitions are exactly the sort of thing tests are good at catching.
 
 ---
 
-## 3. Persist the High Score
+## Order Of Attack
 
-### What you're building
-Save the high score to a file when it's beaten, load it back when the game starts.
-Currently every session starts from zero — this fixes that.
+Do the remaining work in this order:
 
-### New concepts: `pathlib` and `json`
+1. Finish `_update_screen()` so it branches on `game_state`
+2. Fix `_draw_intro_screen()` so the title is centred
+3. Route mouse and keyboard input by state in `_check_events()`
+4. Manually test the full intro -> playing -> intro loop
+5. Update the stale test and `TEST_OUTLINE.md`
 
-`pathlib.Path` is the modern way to work with file paths in Python. It's cleaner than
-string concatenation and works the same on every OS:
+That order keeps the work sensible:
+- first make the screen render correctly
+- then make input behave correctly
+- then clean up the test/documentation drift
 
-```python
-from pathlib import Path
-
-save_path = Path("~/.local/share/aliens/highscore.json").expanduser()
-```
-
-`json` turns Python values into text and back — simple:
-
-```python
-import json
-
-# Writing
-with open(save_path, 'w') as f:
-    json.dump({"high_score": 1500}, f)
-
-# Reading
-with open(save_path, 'r') as f:
-    data = json.load(f)
-    score = data["high_score"]
-```
-
----
-
-### TODOs
-
-**Step 1 — add load/save to `GameStats`**
-
-`GameStats` already owns `high_score`, so this is the natural home. Add two methods:
-
-```python
-def load_high_score(self) -> None:
-    # build the path using Path("~/.local/share/aliens/highscore.json").expanduser()
-    # if the file exists, open it and read the high_score value
-    # if the file doesn't exist (FileNotFoundError), set self.high_score = 0
-    # if the value loaded isn't a valid non-negative int, default to 0
-
-def save_high_score(self) -> None:
-    # build the same path
-    # make sure the parent directory exists: path.parent.mkdir(parents=True, exist_ok=True)
-    # write {"high_score": self.high_score} as JSON
-```
-
-The only genuinely new syntax here is `Path` and `json`. The logic is just an
-if/else wrapped in a try/except — nothing you haven't seen.
-
-**Step 2 — call `load_high_score()` at startup**
-
-In `GameStats.__init__()`, after `self.high_score = 0`, replace that line with a call
-to `self.load_high_score()`. This means the first thing the game does is check whether
-there's a saved score:
-
-```python
-def __init__(self, ai_game) -> None:
-    self.settings = ai_game.settings
-    self.reset_stats()
-    self.load_high_score()   # replaces self.high_score = 0
-```
-
-**Step 3 — call `save_high_score()` when a new high score is set**
-
-This already happens in one place: `Scoreboard.check_high_score()`. Add the save call
-there:
-
-```python
-def check_high_score(self) -> None:
-    if self.stats.score > self.stats.high_score:
-        self.stats.high_score = self.stats.score
-        self.prep_high_score()
-        self.stats.save_high_score()    # add this line
-```
-
-That's it. Don't save anywhere else — you don't need to.
-
-### Watch-outs
-- `Path.expanduser()` is what turns `~` into `/home/yourname/` — don't forget it
-- `mkdir(parents=True, exist_ok=True)` won't crash if the directory already exists;
-  that's the whole point of `exist_ok=True`
-- After loading, validate the value: `if isinstance(score, int) and score >= 0` before
-  assigning it. Someone (future you) might edit the file manually and break it
-
----
-
-## Order of attack
-
-Do them in this order — each one is independent, but this sequence keeps the changes
-small and testable:
-
-1. **High score persistence** — pure Python, no pygame, easiest win
-2. **Sound effects** — isolated additions, nothing existing changes
-3. **Intro screen** — most invasive (touches `_update_screen` and `_check_events`),
-   do it last so you're not debugging state changes on top of new audio code
+Small, testable steps. No heroics required.
