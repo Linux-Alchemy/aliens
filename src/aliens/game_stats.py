@@ -1,6 +1,10 @@
 # stat tracking for the game
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aliens.main import AlienInvasion
 
 high_score_file = Path(__file__).parent.parent.parent/"assets"/"high_score.txt"
 
@@ -8,7 +12,7 @@ high_score_file = Path(__file__).parent.parent.parent/"assets"/"high_score.txt"
 class GameStats():
     """Tracking statistics for the game"""
 
-    def __init__(self, ai_game) -> None:
+    def __init__(self, ai_game: "AlienInvasion") -> None:
         """Initialize statistics"""
         self.settings = ai_game.settings
         self.reset_stats()

@@ -1,14 +1,18 @@
 # scoreboard config
 
 import pygame
+from typing import TYPE_CHECKING
 from pygame.sprite import Group
 from .ship import Ship
+
+if TYPE_CHECKING:
+    from aliens.main import AlienInvasion
 
 
 class Scoreboard():
     """Blueprints for the scoreboard mechanism"""
 
-    def __init__(self, ai_game) -> None:
+    def __init__(self, ai_game: "AlienInvasion") -> None:
         """Initialize the scoreboard"""
         super().__init__()
         self.ai_game = ai_game

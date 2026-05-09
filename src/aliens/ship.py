@@ -2,14 +2,18 @@
 
 import pygame
 from pathlib import Path
+from typing import TYPE_CHECKING
 from pygame.sprite import Sprite
+
+if TYPE_CHECKING:
+    from aliens.main import AlienInvasion
 
 ship_image = Path(__file__).parent.parent.parent/"assets"/"ship2.jpg"
 
 class Ship(Sprite):
     """Blueprints for the hero ship"""
 
-    def __init__(self, ai_game) -> None:
+    def __init__(self, ai_game: "AlienInvasion") -> None:
         """Initializing the ship and starting position"""
         super().__init__()
         self.screen = ai_game.screen

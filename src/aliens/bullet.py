@@ -1,12 +1,16 @@
 # bullet mechanix
 
 import pygame
+from typing import TYPE_CHECKING
 from pygame.sprite import Sprite
+
+if TYPE_CHECKING:
+    from aliens.main import AlienInvasion
 
 class Bullet(Sprite):
     """Management of the bullet behavior"""
 
-    def __init__(self, ai_game) -> None:
+    def __init__(self, ai_game: "AlienInvasion") -> None:
         """Create the bullet object"""
         super().__init__()
         self.screen = ai_game.screen

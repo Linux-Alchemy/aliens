@@ -1,11 +1,15 @@
 # bulding the play button
 
 import pygame
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aliens.main import AlienInvasion
 
 class Button():
     """Botton blueprints"""
 
-    def __init__(self, ai_game, msg) -> None:
+    def __init__(self, ai_game: "AlienInvasion", msg: str) -> None:
         """Initialize the button"""
         self.screen = ai_game.screen
         self.screen_rect = self.screen.get_rect()
